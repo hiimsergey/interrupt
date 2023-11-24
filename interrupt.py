@@ -11,6 +11,22 @@ from os.path import basename
 from pydub import AudioSegment
 
 # Helper functions
+def colorize(string, color):
+    color_dict = {
+        "red": "\033[31m",
+        "green": "\033[32m",
+        "yellow": "\033[33m",
+        "blue": "\033[34m",
+        "magenta": "\033[35m",
+        "cyan": "\033[36m",
+        "purple": "\033[45m", # TODO bg magenta
+        "reset": "\033[0m", # default color
+        "bold": "\033[1m",
+        "italic": "\033[3m"
+    }
+
+    return f"{color_dict.get(color)}{string}{color_dict['reset']}"
+
 def input_as_str(): return ", ".join(map(basename, args.input))
 
 def ms_to_timestamp(ms):
@@ -18,7 +34,7 @@ def ms_to_timestamp(ms):
     minutes = math.floor(ms / 60_000 % 60)  # convert ms to min and take hour rest using modulo
     seconds = math.floor(ms / 1_000 % 60)   # convert ms to s and take minute rest using modulo
     
-    return "{}h {:02d}min {:02d}s".format(hours, minutes, seconds)
+    return colorize("{}h {:02d}min {:02d}s".format(hours, minutes, seconds), "cyan")
 
 def placeholder_name():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -39,24 +55,30 @@ args = parser.parse_args()
 # CLI argumenet actions
 args.length = float(args.length)
 
-if args.verbose: print("Output path: {}\nIncluded sounds: {}".format(args.output, input_as_str()))
-if args.cycle:
-    print(f"Cycling enabled")
-    cycle_index = 0
+if args.verbose: print("{} {}\n{} {}".format(
+    colorize("Output path:", "blue"),
+    colorize(colorize(args.output, "yellow"), "bold"),
+    colorize("Included sounds:", "blue"),
+    colorize(colorize(input_as_str(), "yellow"), "bold")
+))
 
 if args.seed:
-    if args.verbose: print(f"Seed: {args.seed}")
+    if args.verbose: print(f"{colorize('Seed:', 'blue')} {colorize(colorize(args.seed, 'yellow'), 'italic')}\n") # TODO .format syntax
+        # TODO .format syntax for every colorize instance
     random.seed(args.seed)
 
 if args.base:
-    if args.verbose: print(f"Base audio: {basename(args.base)}\n")
+    if args.verbose: print(f"{colorize('Base audio:', 'blue')} {basename(args.base)}\n")
     result = AudioSegment.from_mp3(args.base)
     if args.length > len(result) / 60_000: # if --length is longer than the base audio
         if args.verbose: print(f"WARNING: provided length is longer than the base audio, using full length\n")
         args.length = len(result)
 else:
-    if args.verbose: print(f"Base audio: silence\nLength: {ms_to_timestamp(args.length * 60_000)}\n")
     result = AudioSegment.silent(duration=random.randint(0, args.length * 6_000)) # args.length divided by ten in ms
+
+if args.cycle:
+    print("{}".format(colorize("Cycling enabled\n", "magenta")))
+    cycle_index = 0
 
 # Construct audio
 while len(result) < args.length * 60_000:
@@ -64,20 +86,20 @@ while len(result) < args.length * 60_000:
         cycle_index += 1
         chosen_sound = args.input[cycle_index % len(args.input)]
     else: chosen_sound = random.choice(args.input)
-    if args.verbose: print(f"{ms_to_timestamp(len(result))}: {chosen_sound}")
+    if args.verbose: print(f"{ms_to_timestamp(len(result))}: {colorize(chosen_sound, 'yellow')}") # .format syntax
     result += AudioSegment.from_mp3(chosen_sound)
 
     result += AudioSegment.silent(duration=random.randint(0, args.length * 6_000))
 
 # Increase/decrease volume of the result audio
 if args.volume:
-    if args.verbose: print(f"\nAltering volume by {args.volume}dB\n")
+    if args.verbose: print("\n{}\n".format(colorize(f"Altering volume by {args.volume}dB", "magenta"))) # TODO \\n only next to {}
     result += args.volume
 
 # Export
-if args.verbose: print("Exporting audio... This takes a moment...")
+if args.verbose: print("{}".format(colorize("Exporting audio... This takes a moment...\n", "green")))
 result[:args.length * 60_000].export(args.output, format="mp3")
-if args.verbose: print("\nDone :)")
+if args.verbose: print("{}".format(colorize("Done :)", "green")))
 
 # TODO make this script format agnostic (currently mp3 only)
 # TODO color output
