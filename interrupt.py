@@ -24,7 +24,6 @@ def colorize(string, color):
         "bold": "\033[1m",
         "italic": "\033[3m"
     }
-
     return f"{color_dict.get(color)}{string}{color_dict['reset']}"
 
 def input_as_str(): return ", ".join(map(basename, args.input))
@@ -62,45 +61,57 @@ if args.verbose: print("{} {}\n{} {}".format(
     colorize(colorize(input_as_str(), "yellow"), "bold")
 ))
 
+print("{} {}\n".format(
+    colorize("Length:", "blue"),
+    ms_to_timestamp(args.length * 60_000)
+))
+
 if args.seed:
-    if args.verbose: print(f"{colorize('Seed:', 'blue')} {colorize(colorize(args.seed, 'yellow'), 'italic')}\n") # TODO .format syntax
-        # TODO .format syntax for every colorize instance
+    if args.verbose: print("{} {}\n".format(
+        colorize("Seed:", "blue"),
+        colorize(colorize(args.seed, "yellow"), "italic")
+    ))
     random.seed(args.seed)
 
 if args.base:
-    if args.verbose: print(f"{colorize('Base audio:', 'blue')} {basename(args.base)}\n")
+    if args.verbose: print("{} {}\n".format(
+        colorize("Base audio:", "blue"),
+        basename(args.base)
+    ))
     result = AudioSegment.from_mp3(args.base)
     if args.length > len(result) / 60_000: # if --length is longer than the base audio
         if args.verbose: print(f"WARNING: provided length is longer than the base audio, using full length\n")
         args.length = len(result)
 else:
-    result = AudioSegment.silent(duration=random.randint(0, args.length * 6_000)) # args.length divided by ten in ms
+    result = AudioSegment.silent(duration=random.randint(0, args.length * 6_000)) # --length divided by ten in ms
 
 if args.cycle:
     print("{}".format(colorize("Cycling enabled\n", "magenta")))
     cycle_index = 0
 
 # Construct audio
-while len(result) < args.length * 60_000:
+while len(result) < args.length * 60_000: # convert --length from ms to min
     if args.cycle:
         cycle_index += 1
         chosen_sound = args.input[cycle_index % len(args.input)]
     else: chosen_sound = random.choice(args.input)
-    if args.verbose: print(f"{ms_to_timestamp(len(result))}: {colorize(chosen_sound, 'yellow')}") # .format syntax
+    if args.verbose: print(f"{ms_to_timestamp(len(result))}: {chosen_sound}")
     result += AudioSegment.from_mp3(chosen_sound)
 
     result += AudioSegment.silent(duration=random.randint(0, args.length * 6_000))
 
 # Increase/decrease volume of the result audio
 if args.volume:
-    if args.verbose: print("\n{}\n".format(colorize(f"Altering volume by {args.volume}dB", "magenta"))) # TODO \\n only next to {}
+    if args.verbose: print("\n{}".format(colorize(f"Altering volume by {args.volume}dB", "magenta"))) # TODO \\n only next to {}
     result += args.volume
 
 # Export
-if args.verbose: print("{}".format(colorize("Exporting audio... This takes a moment...\n", "green")))
+if args.verbose: print("{}".format(colorize("\nExporting audio... This takes a moment...", "green")))
 result[:args.length * 60_000].export(args.output, format="mp3")
 if args.verbose: print("{}".format(colorize("Done :)", "green")))
 
 # TODO make this script format agnostic (currently mp3 only)
-# TODO color output
 # TODO redo the entire algorithm for if args.base
+# TODO learn what part of the main logic is so slow
+# TODO compress the audios in size
+# TODO why does this quit on long videos?
